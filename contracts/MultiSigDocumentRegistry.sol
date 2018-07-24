@@ -104,6 +104,13 @@ contract MultiSigDocumentRegistry {
     return docVault[issuer][docId].getEntry(key);
   }
 
+  function getProofHash(address issuer, uint docId)
+    public
+    view
+    returns (bytes32)
+  {
+    return docVault[issuer][docId].getProofHash();
+  }
 
 
 

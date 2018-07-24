@@ -1,12 +1,9 @@
 pragma solidity ^0.4.24;
 
 import "./MultiSigDocument.sol";
-import "./lib/BytesToTypes.sol";
-import "./lib/SizeOf.sol";
 import "./lib/strings.sol";
 
-
-contract MultiSigDocumentWithStorage is MultiSigDocument, ILockableStorage, BytesToTypes, SizeOf {
+contract MultiSigDocumentWithStorage is MultiSigDocument, ILockableStorage {
   using strings for *;
   string constant NULL_CHAR = '\u0000';
   //Data
@@ -26,10 +23,8 @@ contract MultiSigDocumentWithStorage is MultiSigDocument, ILockableStorage, Byte
     bytes buffer
     )
   MultiSigDocument(signers, verifier, required, effectiveDurationInDay, 30)
-  /* validEntriesLength(entryKeys.length, entryValues.length) */
   public
   {
-    /* allKeysInString = _enntryStr; */
     setData(offset, buffer);
   }
 
@@ -46,26 +41,62 @@ contract MultiSigDocumentWithStorage is MultiSigDocument, ILockableStorage, Byte
     assert(writable);
     _;
   }
-
+  event LogString(uint l1, string s1, string  s2);
   function setData(uint offset, bytes memory buffer)
     internal
   {
-    // Support only  value string with more than 32 chars
     while(offset > 0) {
-      string memory valueStr = new string(getStringSize(offset, buffer));
-      bytesToString(offset, buffer, bytes(valueStr));
-      offset -= sizeOfString(valueStr);
 
-      string memory keyStr = new string(getStringSize(offset, buffer));
-      bytesToString(offset, buffer, bytes(keyStr));
-      offset -= sizeOfString(keyStr);
-      /* assert(bytes(keyStr).length <= 32);
-      string memory strippedKey = valueStr.toSlice().split(NULL_CHAR.toSlice()).toString(); */
+      uint size;
+      assembly {
+         size := mload(add(buffer, offset))
+      }
+      string memory strKey = new string(size);
+      writeBytesToString(offset, buffer, bytes(strKey));
+      offset -= sizeOfString(strKey);
+      assembly {
+         size := mload(add(buffer, offset))
+      }
+      string memory strVal = new string(size);
+      writeBytesToString(offset, buffer, bytes(strVal));
+      offset -= sizeOfString(strVal);
 
-      string memory strippedVal = valueStr.toSlice().split(NULL_CHAR.toSlice()).toString();
+      string memory strippedVal = strVal.toSlice().split(NULL_CHAR.toSlice()).toString();
+      entryStorage[keccak256(abi.encodePacked(strKey))] = strippedVal;
 
-      entryStorage[keyStr.toSlice().keccak()] = strippedVal;
-      entryKeys.push(keyStr);
+      entryKeys.push(strKey.toSlice().split(NULL_CHAR.toSlice()).toString());
+    }
+  }
+
+  function sizeOfString(string _in)
+    internal
+    pure
+    returns(uint _size)
+  {
+      _size = bytes(_in).length / 32;
+       if(bytes(_in).length % 32 != 0)
+          _size++;
+
+      _size++;
+      _size *= 32;
+  }
+
+  function writeBytesToString(uint offset, bytes buffer, bytes output)
+    internal
+    pure
+  {
+    uint size = 32;
+    assembly {
+      let word_count
+      size := mload(add(buffer, offset))
+      word_count := add(div(size,32), 1)
+      if gt(mod(size, 32), 0) {
+        word_count := add(word_count,1)
+      }
+      for { let i := 0 } lt(i, word_count) { i := add(i, 1) } {
+        mstore(add(output,mul(i, 0x20)),mload(add(buffer,offset)))
+        offset:= sub(offset, 32)
+      }
     }
   }
 
@@ -76,7 +107,8 @@ contract MultiSigDocumentWithStorage is MultiSigDocument, ILockableStorage, Byte
   {
     for(uint32 i = 0 ; i < entryKeys.length; i++)
     {
-      out1 = out1.toSlice().concat(entryKeys[i].toSlice()).toSlice().concat(";".toSlice());
+      out1 = out1.toSlice().concat(
+        entryKeys[i].toSlice()).toSlice().concat(";".toSlice());
     }
   }
 
@@ -108,7 +140,6 @@ contract MultiSigDocumentWithStorage is MultiSigDocument, ILockableStorage, Byte
     onlyIssuer()
   {
     entryStorage[key.toSlice().keccak()] = value;
-    /* string memory tmp = allKeysInString.toSlice().concat(",".toSlice());//.toSlice().concat(key.toSlice()); */
     entryKeys.push(key);
     emit EntrySet(address(this), key);
   }
@@ -130,13 +161,12 @@ contract MultiSigDocumentWithStorage is MultiSigDocument, ILockableStorage, Byte
     isWritable()
     onlyIssuer()
   {
-    delete entryStorage[key.toSlice().keccak()]; //set entry to Default value of its type
+    delete entryStorage[key.toSlice().keccak()];
     emit EntryDeleted(address(this), key);
   }
 
   function changeWritePermission(bool _writable, string memory key)
     public
-    /* beforeModificationDeadline() */
     onlyVerifier()
   {
     writable = _writable;
@@ -164,14 +194,17 @@ contract MultiSigDocumentWithStorage is MultiSigDocument, ILockableStorage, Byte
       allowDelete()
       signerExists(msg.sender)
   {
-      // Refund all Ethers back to issuer
       selfdestruct(issuer);
   }
-  // GDPR
+
   function deleteData()
       internal
   {
 
+  }
+
+  function () public {
+    // fallback
   }
 
 }

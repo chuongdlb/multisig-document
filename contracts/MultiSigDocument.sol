@@ -1,6 +1,6 @@
 pragma solidity ^0.4.24;
 
-import 'openzeppelin-solidity/contracts/ECRecovery.sol';
+import './lib/ECRecovery.sol';
 
 
 contract ILockableStorage {
@@ -42,10 +42,7 @@ contract IMultipleSignatory {
 
 contract MultiSigDocument is IMultipleSignatory {
   using ECRecovery for bytes32;
-
   uint public constant MAX_SIGNER_COUNT = 10;
-  /* string public constant ROLE_SIGNER = "signer";
-  string public constant ROLE_VERIFIER = "verifier"; */
   uint public createdTime; //Timestamp
   uint public validDays = 365; //days
   uint public expiration = 2**256-1; // Default to infinite time - Timestamp
@@ -58,14 +55,13 @@ contract MultiSigDocument is IMultipleSignatory {
   address public issuer;
   // Keep track of signers
   // uint32 public signerCount = 0; // include issuer
-  //
   uint8 public finalizedSigConfirmations = 0;
-  uint8 public deleteConfirmations = 0;
-  // signer list
-  //mapping (uint => address) public signers;
-  mapping (address => SignerProperty) public signerProperties;
-  address[] signers = new address[](MAX_SIGNER_COUNT);
 
+  uint8 public deleteConfirmations = 0;
+
+  mapping (address => SignerProperty) public signerProperties;
+
+  address[] signers = new address[](MAX_SIGNER_COUNT);
 
   struct SignerProperty {
     bool IsSigner;
@@ -133,7 +129,11 @@ contract MultiSigDocument is IMultipleSignatory {
               uint _validDays,
               uint _allowRevocationPeriodInDays)
       public
-      validRequirement(_signer.length, _numOfRequiredSignature, _validDays, _allowRevocationPeriodInDays)
+      validRequirement(
+        _signer.length,
+        _numOfRequiredSignature,
+        _validDays,
+        _allowRevocationPeriodInDays)
   {
       for (uint i=0; i<_signer.length; i++) {
           assert(_signer[i] != address(0) && _signer[i] != msg.sender);
@@ -175,7 +175,7 @@ contract MultiSigDocument is IMultipleSignatory {
       assert(signerProperties[recoveredAddr].IsSigner);
       assert(signerProperties[recoveredAddr].IsSigned);
 
-      signerProperties[recoveredAddr].DeleteConfirmed = confirmedDeleted ;//!=0 ? true: false;
+      signerProperties[recoveredAddr].DeleteConfirmed = confirmedDeleted;
       emit DeleteDocumentConfirmation(address(this), verifier);
   }
 
@@ -201,15 +201,16 @@ contract MultiSigDocument is IMultipleSignatory {
         emit LogInvalidSignatureSubmission(msg.sender);
         revert('Submitting signature is invalid!');
       }
-      address recoveredAddr = keccak256(abi.encodePacked(address(this), verifier, getProofHash()))
+      address recoveredAddr = keccak256(
+        abi.encodePacked(address(this), verifier, getProofHash()))
         .toEthSignedMessageHash()
         .recover(sig);
-      /* assert(!signerProperties[recoveredAddr].IsSigned); */
       signerProperties[recoveredAddr].IsSigned = true;
       finalizedSigConfirmations++;
 
       emit DocumentSigned(address(this), verifier);
   }
+
   /**
    * TODO: Overide this function
    */
@@ -318,5 +319,8 @@ contract MultiSigDocument is IMultipleSignatory {
   {
       verified = false;
       emit Revocation(verifier, address(this));
+  }
+  function () public {
+    //fallback
   }
 }

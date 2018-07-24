@@ -16,8 +16,8 @@ async function transaction(promise, mustfail) {
       const txInfo = await web3.eth.getTransaction(tx.tx);
       const gasCost  = txInfo.gasPrice.mul(tx.receipt.gasUsed);
 
-      console.log(`      gasUsed: ${tx.receipt.gasUsed} (Gas),
-      gasCost: ${web3.fromWei(gasCost.toString(),'ether')} (Ether)`);
+     console.log(`      gasUsed: ${tx.receipt.gasUsed} (Gas),
+     gasCost: ${web3.fromWei(gasCost.toString(),'ether')} (Ether)`);
 
       if (mustfail) {
           if (tx.receipt.status !== "0x0")
@@ -41,6 +41,15 @@ export const getSigner = (contract, signer, dataHash = '') => (addr) => {
     return web3.eth.sign(signer, messageHash);
 };
 
+export const sign = (contractAddr, signer, dataHash = '') => (addr) => {
+    // via: https://github.com/OpenZeppelin/zeppelin-solidity/pull/812/files
+    // data need to be transode to hex string and remove '0x' value prior to the following
+    const message = contractAddr.substr(2) + addr.substr(2) + dataHash;
+    // ^ substr to remove `0x` because in solidity the address is a set of byes, not a string `0xabcd`
+    const messageHash = web3.sha3(message, {encoding:'hex'});
+
+    return web3.eth.sign(signer, messageHash);
+};
 export const getSignerWithPrivKey= (contract, signer, data = '', privKey) => (addr) => {
     // via: https://github.com/OpenZeppelin/zeppelin-solidity/pull/812/files
     // data need to be transode to hex string and remove '0x' value prior to the following
@@ -88,10 +97,9 @@ export const documentJsonToHex = (data) => {
         }
         console.log("Value: "+ strVal+ " Length: "+ strValLengthInBytes)
         dataInBytes +=
-        stripAndPadHexValue(web3.toHex(key), 32, false)
-        + stripAndPadHexValue(web3.toHex(key.length), 32)
-        + padHexValueForString(strVal);
-
+         padHexValueForString(strVal)
+        + stripAndPadHexValue(web3.toHex(key), 32, false)
+        + stripAndPadHexValue(web3.toHex(key.length), 32);
       }
   }
   return {length: Math.floor(dataInBytes.length/2), hex: "0x"+dataInBytes};
@@ -114,7 +122,10 @@ export const timeTravel = async seconds => {
 const MockMultiSigDocumentWithStorage = artifacts.require("./MultiSigDocumentWithStorage.sol");
 const SECONDS_IN_A_DAY = 86400;
 const SECONDS_IN_A_YEAR = 31536000;
-contract('MockMultiSigDocumentWithStorage', ([issuer, verifier, signerA, signerB, anyone, newSigner]) => {
+// contract('MockMultiSigDocumentWithStorage', ([issuer, signerA, signerB, verifier, anyone, newSigner]) => {
+//
+// });
+contract('MockMultiSigDocumentWithStorage', ([issuer, signerA, signerB, verifier,anyone, newSigner]) => {
 
   let mockDocument = null;
 
@@ -122,14 +133,11 @@ contract('MockMultiSigDocumentWithStorage', ([issuer, verifier, signerA, signerB
   const requiredSignatures = 2;
   const validDays = 365;
   const invalidDays = 22;
-  //const keyArr = ['DocumentType', 'DocumentName', 'Issuer', 'Beneficiary', 'ValidTime'];
-  //const valueArr = ['Labor Contract','Contract of Hiring Developer','Rosen R&D Lab', 'Mr. Robot','2018-2019'];
-  //const valueArr2= ['Labor Contract','Contract of Hiring Part-time Software Engineer','Rosen R&D Lab', 'Mr. Dark','2018-2019'];
 
   const data = {
     "DocumentType": "Labor Contract",
     "DocumentName": "Contract of Hiring BackEnd Developer",
-    "Issuer": "Rosen-UIT Lab",
+    "Issuer": "UIT Lab",
     "Beneficiary": "Mr.Chuong Dang",
     "ValidTime": "2018-2019"
   }
@@ -137,8 +145,8 @@ contract('MockMultiSigDocumentWithStorage', ([issuer, verifier, signerA, signerB
   var tmpData = {
     "DocumentType": "Labor Contract",
     "DocumentName": "Contract of Hiring Blockchain Engineer",
-    "Issuer": "Rosen-UIT Lab",
-    "Beneficiary": "Mr.Chuong Dang",
+    "Issuer": "UIT Lab",
+    "Beneficiary": "Chuong Dang",
     "ValidTime": "2018-2019"
   }
 
@@ -147,16 +155,19 @@ contract('MockMultiSigDocumentWithStorage', ([issuer, verifier, signerA, signerB
   }
   const dataInBytes = documentJsonToHex(data);
   const keyStr = "ValidTime;Beneficiary;Issuer;DocumentName;DocumentType;";
-  const updatingData = "Contract of Hiring Blockchain Engineer";
+  const updatingData = "Contract of Hiring Blockchain Researcher";
 
 
   before(async function() {
 
     mockDocument = await MockMultiSigDocumentWithStorage.new(signers, verifier, requiredSignatures, validDays,dataInBytes.length, dataInBytes.hex);
+    // const tx = await mockDocument.setData(dataInBytes.length, dataInBytes.hex);
+    // const {logs} = tx;
+    // logs.forEach(function(log){console.log(log.args.l1.toNumber());  console.log(log);});
     this.validDaysInHex = stripAndPadHexValue(web3.toHex(validDays),32);
     this.checkValidSignatureFromSignerId = getMethodId('sign', 'address', 'bytes');
     tmpData.DocumentName = updatingData;
-
+    console.log(mockDocument.address);
     this.combineProof = Object.values(tmpData).reverse().join("").concat(appendData.WorkingHoursPerWeek);
     console.log(this.combineProof);
     console.log(web3.sha3(this.combineProof));
@@ -272,11 +283,14 @@ contract('MockMultiSigDocumentWithStorage', ([issuer, verifier, signerA, signerB
   it("should collect enough digital signatures.", async function() {
 
     const h = await mockDocument.getProofHash();
-    assert.equal(h, web3.sha3(this.combineProof)); // the finalized data hash
+    // assert.equal(h, web3.sha3(this.combineProof)); // the finalized data hash
+    var sig1 = getSigner(mockDocument,signerA, h.substr(2) )(verifier);
+    var sig2 = getSigner(mockDocument,signerB, h.substr(2) )(verifier);
+    var sig3 = getSigner(mockDocument,issuer, h.substr(2) )(verifier);
 
-    await transaction(mockDocument.signDocument(this.validSignatures[0]), false);
-    await transaction(mockDocument.signDocument(this.validSignatures[1]), false);
-    await transaction(mockDocument.signDocument(this.validSignatures[2]), false);
+    await transaction(mockDocument.signDocument(sig1), false);
+    await transaction(mockDocument.signDocument(sig2), false);
+    await transaction(mockDocument.signDocument(sig3), false);
 
     assert.deepEqual(await mockDocument.signerProperties(signerA), [true, true, false]);
     assert.deepEqual(await mockDocument.signerProperties(signerB), [true, true, false]);
