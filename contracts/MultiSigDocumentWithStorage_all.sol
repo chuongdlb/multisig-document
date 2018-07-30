@@ -78,19 +78,6 @@ library ECRecovery {
 
 // File: contracts/MultiSigDocument.sol
 
-contract ILockableStorage {
-    function getAllKeys() public view returns(string);
-    function addEntry(string memory key, string value) public;
-    function getEntry(string memory key) public view returns (string);
-    function updateEntry(string memory key, string value) public;
-    function deleteEntry(string memory key) public; // Delete Value only
-    function changeWritePermission(bool _writable, string memory key) public;
-
-    event EntrySet(address indexed document, string entryKey);
-    event EntryDeleted(address indexed document, string entryKey);
-    event EntryUpdateRequest(address indexed document, string entryKey);
-}
-
 contract IMultipleSignatory {
     function isEnoughSignature() public view returns (bool);
     function changeNumberOfRquiredSignatures(uint newRequiredNumber) public;
@@ -227,6 +214,7 @@ contract MultiSigDocument is IMultipleSignatory {
       numOfRequiredSignature = _numOfRequiredSignature + 1;
       allowModificationDeadline = createdTime + (_allowRevocationPeriodInDays * 1 days);
   }
+
   function isVerifier(address addr)
     public
     view
@@ -234,6 +222,7 @@ contract MultiSigDocument is IMultipleSignatory {
   {
     return (verifier == addr);
   }
+
   function isIssuer(address addr)
     public
     view
@@ -241,6 +230,7 @@ contract MultiSigDocument is IMultipleSignatory {
   {
     return (issuer == addr);
   }
+
   function submitDeleteConfirmation(bool confirmedDeleted, bytes memory sig)
       public
   {
@@ -254,8 +244,6 @@ contract MultiSigDocument is IMultipleSignatory {
       emit DeleteDocumentConfirmation(address(this), verifier);
   }
 
-
-
   function changeNumberOfRquiredSignatures(uint newRequiredNumber)
       public
       onlyVerifier()
@@ -267,10 +255,8 @@ contract MultiSigDocument is IMultipleSignatory {
       numOfRequiredSignature = newRequiredNumber;
   }
 
-
   function signDocument(bytes  memory sig)
       public
-      afterModificationDeadline()
   {
       if(!isValidSignature(sig)) {
         emit LogInvalidSignatureSubmission(msg.sender);
@@ -1122,6 +1108,19 @@ library strings {
 }
 
 // File: contracts/MultiSigDocumentWithStorage.sol
+
+contract ILockableStorage {
+    function getAllKeys() public view returns(string);
+    function addEntry(string memory key, string value) public;
+    function getEntry(string memory key) public view returns (string);
+    function updateEntry(string memory key, string value) public;
+    function deleteEntry(string memory key) public; // Delete Value only
+    function changeWritePermission(bool _writable, string memory key) public;
+
+    event EntrySet(address indexed document, string entryKey);
+    event EntryDeleted(address indexed document, string entryKey);
+    event EntryUpdateRequest(address indexed document, string entryKey);
+}
 
 contract MultiSigDocumentWithStorage is MultiSigDocument, ILockableStorage {
   using strings for *;

@@ -2,20 +2,6 @@ pragma solidity ^0.4.24;
 
 import './lib/ECRecovery.sol';
 
-
-contract ILockableStorage {
-    function getAllKeys() public view returns(string);
-    function addEntry(string memory key, string value) public;
-    function getEntry(string memory key) public view returns (string);
-    function updateEntry(string memory key, string value) public;
-    function deleteEntry(string memory key) public; // Delete Value only
-    function changeWritePermission(bool _writable, string memory key) public;
-
-    event EntrySet(address indexed document, string entryKey);
-    event EntryDeleted(address indexed document, string entryKey);
-    event EntryUpdateRequest(address indexed document, string entryKey);
-}
-
 contract IMultipleSignatory {
     function isEnoughSignature() public view returns (bool);
     function changeNumberOfRquiredSignatures(uint newRequiredNumber) public;
@@ -152,6 +138,7 @@ contract MultiSigDocument is IMultipleSignatory {
       numOfRequiredSignature = _numOfRequiredSignature + 1;
       allowModificationDeadline = createdTime + (_allowRevocationPeriodInDays * 1 days);
   }
+  
   function isVerifier(address addr)
     public
     view
