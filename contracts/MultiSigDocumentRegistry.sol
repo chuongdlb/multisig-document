@@ -16,9 +16,9 @@ contract MultiSigDocumentRegistry {
   //Store verifier info.
   mapping (address => Verifier) public verifierInfo;
   // Store created and indexed Document by Issuer's address
-  mapping (address => mapping(uint => MultiSigDocumentWithStorage)) public docVault;
+  mapping (address => MultiSigDocumentWithStorage[]) public docVault;
   // Keep track how many documents each Issuer have.
-  mapping (address => uint) docCount;
+  /* mapping (address => uint) docCount; */
 
   modifier onlyVerifier(bool isVerifier) {
       assert(isVerifier);
@@ -67,13 +67,13 @@ contract MultiSigDocumentRegistry {
     isRegisteredVerifier(verifier)
     returns (address)
   {
-    docVault[msg.sender][docCount[msg.sender]] =
-      new MultiSigDocumentWithStorage(signers, verifier, required, validDays, offset, buffer);
 
-    docCount[msg.sender] = docCount[msg.sender] + 1;
+    docVault[msg.sender].push(new MultiSigDocumentWithStorage(signers, verifier, required, validDays, offset, buffer));
 
-    emit DocumentCreated(msg.sender, address(docVault[msg.sender][docCount[msg.sender]]));
-    return docVault[msg.sender][docCount[msg.sender]];
+    /* docCount[msg.sender] = docCount[msg.sender] + 1; */
+
+    emit DocumentCreated(msg.sender, docVault[msg.sender][docVault[msg.sender].length - 1]);
+    return docVault[msg.sender][docVault[msg.sender].length - 1];
   }
 
   function setDocument(MultiSigDocumentWithStorage doc)
@@ -81,9 +81,10 @@ contract MultiSigDocumentRegistry {
     onlyIssuer(doc.isIssuer(msg.sender))
   {
     /* docVault[msg.sender][docCount[msg.sender]] = Document({docAddr: docAddr}); */
-    docVault[msg.sender][docCount[msg.sender]] = doc;
+    /* docVault[msg.sender][docCount[msg.sender]] = doc;
 
-    docCount[msg.sender] = docCount[msg.sender] + 1;
+    docCount[msg.sender] = docCount[msg.sender] + 1; */
+    docVault[msg.sender].push (doc);
 
     emit DocumentIndexed(msg.sender, address(doc));
   }
@@ -112,7 +113,12 @@ contract MultiSigDocumentRegistry {
     return docVault[issuer][docId].getProofHash();
   }
 
-
-
+  function isEnoughSignature(address issuer, uint docId)
+    public
+    view
+    returns (bool)
+  {
+    return docVault[issuer][docId].isEnoughSignature();
+  }
 
 }

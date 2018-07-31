@@ -3,8 +3,10 @@
 
 Master dissertation in Computer Science @**UIT**
 
-**Author**: chuongdlb@uit.edu.vn
+**Author**: chuongdlb@uit.edu.vn 
 
+* Example contract **MultiSigDocumentRegistry**
+`0x66D88d80139a7eeFC54F67Ab9F158C1f74270609`
 * Example contract **MultiSigDocumentWithStorage**:
 `0x5828D159306946d0A35aa6bE16FF3A355071D473`
 * Signers: 
